@@ -93,4 +93,4 @@ userSchema.methods.generateRefreshToken = function(){
     )
 }
 
-export default User = new model('User', userSchema);
+export const User = new model('User', userSchema);

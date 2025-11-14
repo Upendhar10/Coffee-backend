@@ -6,12 +6,12 @@ import ApiResponse from "../utils/apiResponse.js";
 
 const registerUser = asyncHandler( async (req, res) => {
     // 1. Get the User Details from the Client
-    const {fullName, email, username} = req.body;
+    const {fullName, email, username, password} = req.body;
 
     // 2. Validate the User Details
     // Condition : fullName === "" || email === "" || username
     if(
-        [fullName, email, username].some((field) => field.trim() === "")
+        [fullName, email, username, password].some((field) => field.trim() === "")
     ){
         throw new ApiError(400, 'All fields are required!');
     }
@@ -31,9 +31,17 @@ const registerUser = asyncHandler( async (req, res) => {
     
     // 4. Check for images in user Details - avatar, coverImage
     const avatarLocalFilePath = req.files?.avatar[0]?.path;
-    const coverImageLocalFilePath = req.files?.coverImage[0]?.path;
+    let coverImageLocalFilePath;
 
-    if(avatarLocalFilePath){
+    if(
+        req.files 
+        && Array.isArray(req.files.coverImage) 
+        && req.files.coverImage.length > 0
+    ){
+        coverImageLocalFilePath = req.files.coverImage[0].path;
+    }
+
+    if(!avatarLocalFilePath){
         throw new ApiError(400, "avatar file is required!");
     }
 
@@ -53,7 +61,7 @@ const registerUser = asyncHandler( async (req, res) => {
         coverImage:coverImage?.url || "",
         email,
         password,
-        username : username.toLowercase()
+        username : username.toLowerCase()
     })
 
     // 8. Remove password & refresh-token field from response.
