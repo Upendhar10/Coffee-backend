@@ -4,6 +4,31 @@ import {User} from "../models/user.model.js";
 import fileUploadOnCloudinary from "../utils/cloudinary.js"
 import ApiResponse from "../utils/apiResponse.js";
 
+async function generateAccessAndRefreshTokens(userId){
+    try {
+        // Obtain user-details from Db
+        const user = User.findById(userId);
+        // generate access token
+        const accessToken = user.generateAccessToken();
+        // generate refresh token
+        const refreshToken = user.generateRefreshToken();
+
+        // Update and save refreshToken in the Db
+        user.refreshToken = refreshToken;
+        // save the refreshtoken without any need of user validation
+        await user.save({validateBeforeSave : false});
+
+        return {
+            accessToken,
+            refreshToken
+        }
+
+    } catch (error) {
+        throw new ApiError(500, "Something went wrong while generating Access and Refresh Tokens");
+    }
+}
+
+// Register User
 const registerUser = asyncHandler( async (req, res) => {
     // 1. Get the User Details from the Client
     const {fullName, email, username, password} = req.body;
@@ -83,6 +108,67 @@ const registerUser = asyncHandler( async (req, res) => {
     )
 })
 
+// Login User
+const loginUser = asyncHandler( async (req, res) => {
+
+    // 1. Get the User Input from req.body
+    const {email, username, password} = req.body;
+
+    // 2. Validate the User Input for Empty values;
+    if(!username || !email){
+        throw new ApiError(400, 'username or email is required!');
+    }
+
+    if(!password){
+        throw new ApiError(400,"password required!");
+    }
+
+    // 3. Check if the User exits or not in the Db
+    const requiredUser = await User.findOne({
+        $or : [{username},{email}]
+    })
+
+    if(!requiredUser){
+        throw new ApiError(400, 'NO USER FOUND!');
+    }
+
+    // 4. Validate User using password comparison
+    const isPasswordValid = await requiredUser.isPasswordCorrect(password);
+
+    if(!isPasswordValid){
+        throw new ApiError(401, "Invalid User Credentials!");
+    }
+
+    // 5. Generate Access-token and Refresh Token
+    const {accessToken, refreshToken} = await generateAccessAndRefreshTokens(registerUser._id);
+
+    // Update the requiredUser (or) fetch the requiredUser from the Db
+    const loggedInUser = await User.findById(requiredUser._id).select('-password -refreshToken');
+
+    // 6. Send Cookies 
+    // By default, Cookies can be modified via frontend, so we need to restrict this behaviour, 
+    // To restrict this behaviour, we set Options for Cookies.
+    const Options = {
+        httpOnly : true,
+        secure : true
+    }
+
+    return res
+    .status(200)
+    .cookie('accessToken', accessToken, Options)
+    .cookie('refreshToken', refreshToken, Options)
+    .json(
+        new ApiResponse(200, {
+            user : loggedInUser,
+            accessToken,
+            refreshToken
+        },
+        "User logged In Sucessfully!")
+    )
+})
+
+
+
 export default registerUser;
 
 /*
@@ -96,4 +182,16 @@ export default registerUser;
     7. Create User Object in the Database using the data provided by the user
     8. Remove password & refresh-token field from response.
     9. Check for user Creation in the Database, if created, send 'Sucessful' or send 'Error'
+*/ 
+
+/*
+    # How to Login a user ?
+    1. Get the User Details such as username or email and password from req.body
+    2. Validate the User Input for empty fields
+    3. Check if the User exits or not in the Db
+        - If not, route to register page.
+    4. If exits, Validate User using password comparison
+    5. If matched, generate acces-token and refresh-token
+          - If not, Show Error message to the user.
+    6. send Cookies
 */ 
