@@ -167,9 +167,40 @@ const loginUser = asyncHandler( async (req, res) => {
     )
 })
 
+// Logout User
+const logoutUser = asyncHandler(async(req, res) => {
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: {
+                refreshToken : undefined
+            }
+        },
+        {
+            new : true
+        }
+    )
 
+    const Options = {
+        httpOnly : true,
+        secure : true
+    }
 
-export default registerUser;
+    return res
+    .status(200)
+    .clearCookie('accessToken', Options)
+    .clearCookie('refreshToken', Options)
+    .json(
+        new ApiResponse(200),{},"User logged out Sucessfully!"
+    )
+
+})
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser
+};
 
 /*
     # How to register a user ?
@@ -194,4 +225,13 @@ export default registerUser;
     5. If matched, generate acces-token and refresh-token
           - If not, Show Error message to the user.
     6. send Cookies
+*/ 
+
+/*
+    # How to Logout a user ?
+    1. Clear the cookies
+    2. Remove Access token.
+    3. Update Refresh token to 'undefined' 
+
+
 */ 
